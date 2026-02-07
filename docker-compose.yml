@@ -1,0 +1,97 @@
+services:
+  # ─── Keycloak US Region ──────────────────────────────────────────────
+  keycloak-us:
+    image: quay.io/keycloak/keycloak:24.0
+    container_name: keycloak-us
+    command:
+      - start-dev
+      - --import-realm
+      - --health-enabled=true
+      # Pin the issuer/frontend URL so tokens always have iss=localhost:8080
+      # regardless of whether the request came from Docker or the browser
+      - --hostname-url=http://localhost:8080
+    environment:
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+      KC_HTTP_PORT: 8080
+    ports:
+      - "${KC_US_PORT:-8080}:8080"
+    volumes:
+      - ./keycloak/us-realm.json:/opt/keycloak/data/import/us-realm.json:ro
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/8080 && echo -e 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && cat <&3 | grep -q '200'"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+  # ─── Keycloak EU Region ──────────────────────────────────────────────
+  keycloak-eu:
+    image: quay.io/keycloak/keycloak:24.0
+    container_name: keycloak-eu
+    command:
+      - start-dev
+      - --import-realm
+      - --health-enabled=true
+      # Pin the issuer/frontend URL so tokens always have iss=localhost:8081
+      # regardless of whether the request came from Docker or the browser
+      - --hostname-url=http://localhost:8081
+    environment:
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+      KC_HTTP_PORT: 8080
+    ports:
+      - "${KC_EU_PORT:-8081}:8080"
+    volumes:
+      - ./keycloak/eu-realm.json:/opt/keycloak/data/import/eu-realm.json:ro
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/8080 && echo -e 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && cat <&3 | grep -q '200'"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+  # ─── US Express API ──────────────────────────────────────────────────
+  us-api:
+    build: ./us-api
+    container_name: us-api
+    ports:
+      - "${US_API_PORT:-4000}:4000"
+    environment:
+      PORT: 4000
+      KEYCLOAK_URL: http://keycloak-us:8080
+      KEYCLOAK_EXTERNAL_URL: http://localhost:8080
+      KEYCLOAK_REALM: us-realm
+      CORS_ORIGIN: http://localhost:3000
+      REGION: US
+      # Cross-region: allow EU tokens & EU frontend to call this API
+      CROSS_KEYCLOAK_URL: http://keycloak-eu:8080
+      CROSS_KEYCLOAK_EXTERNAL_URL: http://localhost:8081
+      CROSS_KEYCLOAK_REALM: eu-realm
+      CROSS_CORS_ORIGIN: http://localhost:3001
+    depends_on:
+      keycloak-us:
+        condition: service_healthy
+
+  # ─── EU Express API ──────────────────────────────────────────────────
+  eu-api:
+    build: ./eu-api
+    container_name: eu-api
+    ports:
+      - "${EU_API_PORT:-4001}:4001"
+    environment:
+      PORT: 4001
+      KEYCLOAK_URL: http://keycloak-eu:8080
+      KEYCLOAK_EXTERNAL_URL: http://localhost:8081
+      KEYCLOAK_REALM: eu-realm
+      CORS_ORIGIN: http://localhost:3001
+      REGION: EU
+      # Cross-region: allow US tokens & US frontend to call this API
+      CROSS_KEYCLOAK_URL: http://keycloak-us:8080
+      CROSS_KEYCLOAK_EXTERNAL_URL: http://localhost:8080
+      CROSS_KEYCLOAK_REALM: us-realm
+      CROSS_CORS_ORIGIN: http://localhost:3000
+    depends_on:
+      keycloak-eu:
+        condition: service_healthy
+

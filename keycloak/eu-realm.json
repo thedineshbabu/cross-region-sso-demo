@@ -1,0 +1,226 @@
+{
+  "realm": "eu-realm",
+  "enabled": true,
+  "displayName": "EU Region",
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "editUsernameAllowed": false,
+  "bruteForceProtected": false,
+  "verifyEmail": false,
+  "accessTokenLifespan": 300,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 36000,
+  "offlineSessionIdleTimeout": 2592000,
+  "accessCodeLifespan": 60,
+  "accessCodeLifespanUserAction": 300,
+  "roles": {
+    "realm": [
+      {
+        "name": "user",
+        "description": "Regular user role"
+      }
+    ],
+    "client": {
+      "eu-api": [
+        {
+          "name": "api-user",
+          "description": "API user role"
+        }
+      ]
+    }
+  },
+  "defaultRoles": ["user"],
+  "clients": [
+    {
+      "clientId": "eu-react-app",
+      "name": "EU React Application",
+      "enabled": true,
+      "publicClient": true,
+      "directAccessGrantsEnabled": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "protocol": "openid-connect",
+      "rootUrl": "http://localhost:3001",
+      "baseUrl": "http://localhost:3001",
+      "redirectUris": [
+        "http://localhost:3001/*"
+      ],
+      "webOrigins": [
+        "http://localhost:3001"
+      ],
+      "attributes": {
+        "post.logout.redirect.uris": "http://localhost:3001/*"
+      },
+      "defaultClientScopes": [
+        "web-origins",
+        "acr",
+        "profile",
+        "roles",
+        "email"
+      ],
+      "optionalClientScopes": [
+        "address",
+        "phone",
+        "offline_access",
+        "microprofile-jwt"
+      ]
+    },
+    {
+      "clientId": "eu-api",
+      "name": "EU API Server",
+      "enabled": true,
+      "bearerOnly": true,
+      "publicClient": false,
+      "protocol": "openid-connect",
+      "defaultClientScopes": [
+        "web-origins",
+        "acr",
+        "profile",
+        "roles",
+        "email"
+      ]
+    },
+    {
+      "clientId": "us-keycloak-broker",
+      "name": "US Keycloak Broker Client",
+      "description": "Client used by US Keycloak to broker authentication from EU Keycloak",
+      "enabled": true,
+      "publicClient": false,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "protocol": "openid-connect",
+      "secret": "eu-broker-secret-for-us",
+      "redirectUris": [
+        "http://localhost:8080/realms/us-realm/broker/eu-keycloak-idp/endpoint/*"
+      ],
+      "webOrigins": [
+        "http://localhost:8080"
+      ],
+      "defaultClientScopes": [
+        "web-origins",
+        "acr",
+        "profile",
+        "roles",
+        "email"
+      ]
+    }
+  ],
+  "identityProviders": [
+    {
+      "alias": "us-keycloak-idp",
+      "displayName": "Login with US Keycloak",
+      "providerId": "oidc",
+      "enabled": true,
+      "trustEmail": true,
+      "storeToken": false,
+      "linkOnly": false,
+      "firstBrokerLoginFlowAlias": "Auto Link First Broker Login",
+      "config": {
+        "clientId": "eu-keycloak-broker",
+        "clientSecret": "us-broker-secret-for-eu",
+        "tokenUrl": "http://keycloak-us:8080/realms/us-realm/protocol/openid-connect/token",
+        "authorizationUrl": "http://localhost:8080/realms/us-realm/protocol/openid-connect/auth",
+        "logoutUrl": "http://localhost:8080/realms/us-realm/protocol/openid-connect/logout",
+        "jwksUrl": "http://keycloak-us:8080/realms/us-realm/protocol/openid-connect/certs",
+        "issuer": "http://localhost:8080/realms/us-realm",
+        "userInfoUrl": "http://keycloak-us:8080/realms/us-realm/protocol/openid-connect/userinfo",
+        "validateSignature": "true",
+        "useJwksUrl": "true",
+        "clientAuthMethod": "client_secret_post",
+        "syncMode": "FORCE",
+        "defaultScope": "openid email profile",
+        "hideOnLoginPage": "true"
+      }
+    }
+  ],
+  "identityProviderMappers": [
+    {
+      "name": "email-mapper",
+      "identityProviderAlias": "us-keycloak-idp",
+      "identityProviderMapper": "oidc-user-attribute-idp-mapper",
+      "config": {
+        "syncMode": "INHERIT",
+        "claim": "email",
+        "user.attribute": "email"
+      }
+    },
+    {
+      "name": "first-name-mapper",
+      "identityProviderAlias": "us-keycloak-idp",
+      "identityProviderMapper": "oidc-user-attribute-idp-mapper",
+      "config": {
+        "syncMode": "INHERIT",
+        "claim": "given_name",
+        "user.attribute": "firstName"
+      }
+    },
+    {
+      "name": "last-name-mapper",
+      "identityProviderAlias": "us-keycloak-idp",
+      "identityProviderMapper": "oidc-user-attribute-idp-mapper",
+      "config": {
+        "syncMode": "INHERIT",
+        "claim": "family_name",
+        "user.attribute": "lastName"
+      }
+    },
+    {
+      "name": "username-mapper",
+      "identityProviderAlias": "us-keycloak-idp",
+      "identityProviderMapper": "oidc-username-idp-mapper",
+      "config": {
+        "syncMode": "INHERIT",
+        "template": "${CLAIM.preferred_username}"
+      }
+    }
+  ],
+  "authenticationFlows": [
+    {
+      "alias": "Auto Link First Broker Login",
+      "description": "Automatically links brokered users without prompting",
+      "providerId": "basic-flow",
+      "topLevel": true,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "idp-create-user-if-unique",
+          "authenticatorFlow": false,
+          "requirement": "ALTERNATIVE",
+          "priority": 10
+        },
+        {
+          "authenticator": "idp-auto-link",
+          "authenticatorFlow": false,
+          "requirement": "ALTERNATIVE",
+          "priority": 20
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "eu-user",
+      "enabled": true,
+      "email": "euuser@demo.com",
+      "emailVerified": true,
+      "firstName": "EU",
+      "lastName": "User",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "password",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["user"],
+      "clientRoles": {
+        "eu-api": ["api-user"]
+      }
+    }
+  ]
+}
+

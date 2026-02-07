@@ -1,0 +1,14 @@
+<!doctype html>
+<html>
+  <body>
+    <!--
+      This page is loaded inside a hidden iframe by the Keycloak JS adapter
+      when using "check-sso" mode. It posts the auth response URL back to
+      the parent window so Keycloak can determine login state silently.
+    -->
+    <script>
+      parent.postMessage(location.href, location.origin);
+    </script>
+  </body>
+</html>
+
