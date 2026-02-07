@@ -3,12 +3,26 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>US Region App — Cross-Region SSO Demo</title>
+    <title>US Region — Korn Ferry Talent Suite</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🇺🇸</text></svg>" />
+    <style>
+      /* ── Global resets & Korn Ferry base styles ────────────────────── */
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        font-family: "Helvetica Neue", Helvetica, Arial, "Segoe UI", Roboto, sans-serif;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+      /* Spinner animation used by the loading state */
+      @keyframes spin { to { transform: rotate(360deg); } }
+      /* Smooth focus ring for inputs matching KF design */
+      input:focus { border-color: #0d7c5f !important; box-shadow: 0 0 0 3px rgba(13,124,95,0.12); }
+      /* Sign-In button hover state */
+      button:hover { opacity: 0.92; }
+    </style>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
-

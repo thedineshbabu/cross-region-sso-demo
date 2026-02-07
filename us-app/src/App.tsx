@@ -3,8 +3,6 @@ import keycloak from "./keycloak";
 
 /* ─── Region Configuration ─────────────────────────────────────────── */
 const REGION = "US";
-const REGION_COLOR = "#1a73e8";
-const REGION_BG = "#e8f0fe";
 const OTHER_REGION = "EU";
 const OTHER_APP_URL = "http://localhost:3001";
 const API_URL = "http://localhost:4000";
@@ -12,6 +10,21 @@ const API_URL = "http://localhost:4000";
 const OTHER_API_URL = "http://localhost:4001";
 /** IDP alias registered on the OTHER region's Keycloak that points back to THIS region */
 const CROSS_IDP_HINT = "us-keycloak-idp";
+
+/* ─── Korn Ferry Design Tokens ──────────────────────────────────────
+ * Extracted from the Korn Ferry Talent Suite design system to ensure
+ * visual consistency across all region-specific apps.
+ */
+const KF_GREEN = "#1a9b6c";        // "TALENT" brand green
+const KF_NAVY = "#1B365D";         // "SUITE" brand navy
+const KF_TEAL = "#0d7c5f";         // Primary action teal
+const KF_TEAL_LIGHT = "#e6f7f1";   // Light teal background for info banners
+const KF_GRAY_100 = "#f7f8fa";     // Page background
+const KF_GRAY_200 = "#e9ecef";     // Table borders, dividers
+const KF_GRAY_300 = "#d1d5db";     // Input borders
+const KF_GRAY_500 = "#6b7280";     // Muted text
+const KF_GRAY_700 = "#374151";     // Body text
+const KF_GRAY_900 = "#111827";     // Headings
 
 /* ─── Types ────────────────────────────────────────────────────────── */
 interface TokenPayload {
@@ -67,12 +80,13 @@ export default function App() {
     keycloak.logout({ redirectUri: window.location.origin });
   }, []);
 
+  /* ── Loading state while Keycloak initializes ── */
   if (!initialized) {
     return (
       <div style={styles.loadingContainer}>
         <div style={styles.spinner} />
-        <p style={{ color: "#666", marginTop: 16 }}>
-          Connecting to {REGION} Keycloak...
+        <p style={{ color: KF_GRAY_500, marginTop: 16, fontFamily: kfFont }}>
+          Connecting to {REGION} Region...
         </p>
       </div>
     );
@@ -80,14 +94,12 @@ export default function App() {
 
   return (
     <div style={styles.root}>
-      <Navbar
-        authenticated={authenticated}
-        onLogin={handleLogin}
-        onLogout={handleLogout}
-      />
-      <main style={styles.main}>
-        {authenticated ? (
-          <>
+      {/* Authenticated view shows the full dashboard; otherwise the KF-branded login */}
+      {authenticated ? (
+        <>
+          <Navbar onLogout={handleLogout} />
+          <main style={styles.main}>
+            <SyncBanner />
             <CrossRegionBanner />
             <div style={styles.grid}>
               <UserProfile />
@@ -95,58 +107,61 @@ export default function App() {
             </div>
             <CrossRegionApiDemo />
             <TokenDetails />
-          </>
-        ) : (
-          <LandingPage onLogin={handleLogin} />
-        )}
-      </main>
+          </main>
+        </>
+      ) : (
+        <LandingPage onLogin={handleLogin} />
+      )}
     </div>
   );
 }
 
-/* ─── Navbar ───────────────────────────────────────────────────────── */
-function Navbar({
-  authenticated,
-  onLogin,
-  onLogout,
-}: {
-  authenticated: boolean;
-  onLogin: (loginHint?: string) => void;
-  onLogout: () => void;
-}) {
+/* ─── Font stack matching Korn Ferry's brand typography ─────────────── */
+const kfFont =
+  '"Helvetica Neue", Helvetica, Arial, "Segoe UI", Roboto, sans-serif';
+
+/* ═══════════════════════════════════════════════════════════════════════
+ * NAVBAR — Korn Ferry Talent Suite top bar (authenticated view)
+ * Matches screenshot 2: white bar, navy text "KORN FERRY TALENT SUITE",
+ * region badge, user avatar/initials, and logout.
+ * ═══════════════════════════════════════════════════════════════════════ */
+function Navbar({ onLogout }: { onLogout: () => void }) {
+  const username = keycloak.tokenParsed?.preferred_username || "User";
+  const initials = username.slice(0, 2).toUpperCase();
+
   return (
     <nav style={styles.navbar}>
+      {/* ── Left: branding ── */}
       <div style={styles.navLeft}>
-        <span style={styles.regionBadge}>{REGION}</span>
-        <span style={styles.navTitle}>Cross-Region SSO Demo</span>
+        <span style={styles.brandKornFerry}>KORN FERRY</span>
+        <span style={styles.brandTalent}>TALENT</span>
+        <span style={styles.brandSuite}>SUITE</span>
+        {/* Region indicator chip */}
+        <span style={styles.regionChip}>{REGION} Region</span>
       </div>
+
+      {/* ── Right: user + logout ── */}
       <div style={styles.navRight}>
-        {authenticated && (
-          <span style={styles.username}>
-            {keycloak.tokenParsed?.preferred_username || "User"}
-          </span>
-        )}
-        {authenticated ? (
-          <button style={styles.btnOutline} onClick={onLogout}>
-            Logout
-          </button>
-        ) : (
-          /* Navbar login skips the in-app email step — goes straight to Keycloak */
-          <button style={styles.btnPrimary} onClick={() => onLogin()}>
-            Login
-          </button>
-        )}
+        <span style={styles.helpIcon} title="Help">?</span>
+        <div
+          style={styles.avatar}
+          title={username}
+          onClick={onLogout}
+          role="button"
+          aria-label="Logout"
+        >
+          {initials}
+        </div>
       </div>
     </nav>
   );
 }
 
-/* ─── Landing Page ─────────────────────────────────────────────────── */
-/**
- * Landing page with an in-app email form.
- * The entered email is forwarded to Keycloak as `login_hint`, pre-filling the
- * username field on the Keycloak challenge screen so only the password is required.
- */
+/* ═══════════════════════════════════════════════════════════════════════
+ * LANDING PAGE — Korn Ferry Talent Suite login screen
+ * Matches screenshot 1: gradient background, centered card with
+ * "KORN FERRY" / "TALENT SUITE" branding, email input, Sign In button.
+ * ═══════════════════════════════════════════════════════════════════════ */
 function LandingPage({ onLogin }: { onLogin: (loginHint?: string) => void }) {
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");
@@ -172,30 +187,37 @@ function LandingPage({ onLogin }: { onLogin: (loginHint?: string) => void }) {
   };
 
   return (
-    <div style={styles.landing}>
-      <div style={styles.landingCard}>
-        {/* Lock icon */}
-        <div style={{ fontSize: 48, marginBottom: 8 }}>&#128274;</div>
+    <div style={styles.landingRoot}>
+      {/* ── Floating gradient background blobs ── */}
+      <div style={styles.gradientBlobTopRight} />
+      <div style={styles.gradientBlobBottomLeft} />
 
-        <h1 style={{ margin: 0, fontSize: 28, color: "#1a1a1a" }}>
-          Welcome to the {REGION} Region App
-        </h1>
-        <p style={{ color: "#666", fontSize: 16, lineHeight: 1.6 }}>
-          Enter your email to continue. You will be prompted for your password
-          on the next screen.
-        </p>
+      {/* ── Centered login card ── */}
+      <div style={styles.landingCard}>
+        {/* Korn Ferry branding */}
+        <div style={styles.landingBrandRow}>
+          <span style={styles.landingKF}>KORN FERRY</span>
+        </div>
+        <div style={styles.landingTitleRow}>
+          <span style={styles.landingTalent}>TALENT</span>
+          <br />
+          <span style={styles.landingSuite}>SUITE</span>
+        </div>
+
+        {/* Region sub-label */}
+        <p style={styles.regionSubLabel}>{REGION} Region</p>
+
+        {/* Sign in to your account */}
+        <p style={styles.signInLabel}>Sign in to your account</p>
 
         {/* ─── Email Input Form ─────────────────────────────────────── */}
         <form onSubmit={handleSubmit} style={styles.emailForm}>
-          <label htmlFor="login-email" style={styles.inputLabel}>
-            Email Address
-          </label>
           <input
             id="login-email"
             type="email"
             autoComplete="email"
             autoFocus
-            placeholder="you@example.com"
+            placeholder="bemorethan@kornferry.com"
             value={email}
             onChange={(e) => {
               setEmail(e.target.value);
@@ -203,57 +225,79 @@ function LandingPage({ onLogin }: { onLogin: (loginHint?: string) => void }) {
             }}
             style={{
               ...styles.emailInput,
-              borderColor: error ? "#dc3545" : "#d0d5dd",
+              borderColor: error ? "#dc3545" : KF_GRAY_300,
             }}
           />
           {/* Inline validation error */}
-          {error && (
-            <p style={styles.errorText}>{error}</p>
-          )}
+          {error && <p style={styles.errorText}>{error}</p>}
 
           <button
             type="submit"
-            style={{
-              ...styles.btnPrimary,
-              width: "100%",
-              fontSize: 16,
-              padding: "12px 0",
-              marginTop: 4,
-            }}
+            style={styles.signInBtn}
           >
-            Continue
+            Sign In
           </button>
         </form>
 
         {/* ─── Divider ──────────────────────────────────────────────── */}
         <div style={styles.divider}>
+          <div style={styles.dividerLine} />
           <span style={styles.dividerText}>OR</span>
+          <div style={styles.dividerLine} />
         </div>
 
         {/* Fallback: skip the email step and go directly to Keycloak */}
         <button
           type="button"
-          style={{ ...styles.btnOutline, width: "100%", padding: "10px 0" }}
+          style={styles.directLoginBtn}
           onClick={() => onLogin()}
         >
           Login with {REGION} Keycloak directly
         </button>
 
-        <p style={{ color: "#999", fontSize: 13, marginTop: 16 }}>
-          Keycloak URL:{" "}
-          <code style={styles.code}>http://localhost:8080</code>
-          &nbsp;&bull;&nbsp; Realm: <code style={styles.code}>us-realm</code>
+        {/* Footer link */}
+        <p style={styles.landingFooter}>
+          Keycloak:&nbsp;
+          <span style={styles.footerLink}>http://localhost:8080</span>
+          &nbsp;&bull;&nbsp;Realm:&nbsp;
+          <span style={styles.footerLink}>us-realm</span>
         </p>
       </div>
     </div>
   );
 }
 
-/* ─── Cross-Region Banner ──────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════════════
+ * SYNC BANNER — Teal info bar (matches the blue info banner in screenshot 2)
+ * ═══════════════════════════════════════════════════════════════════════ */
+function SyncBanner() {
+  const now = new Date().toLocaleString("en-US", {
+    month: "long",
+    day: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZoneName: "short",
+  });
+
+  return (
+    <div style={styles.syncBanner}>
+      <span style={styles.syncIcon}>ℹ</span>
+      <span>
+        Cross-region SSO sessions are automatically synced via identity brokering.
+        Last verified: <strong>{now}</strong>.
+      </span>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+ * CROSS-REGION BANNER — Navigate to the other region's app
+ * ═══════════════════════════════════════════════════════════════════════ */
 function CrossRegionBanner() {
   return (
     <div style={styles.crossBanner}>
-      <div>
+      <div style={{ flex: 1 }}>
         <strong>Test Cross-Region SSO:</strong> You are authenticated on{" "}
         {REGION} Keycloak. Click the button to visit the {OTHER_REGION} app —
         you will be automatically signed in via identity brokering without
@@ -270,7 +314,9 @@ function CrossRegionBanner() {
   );
 }
 
-/* ─── User Profile ─────────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════════════
+ * USER PROFILE — Styled as a KF-branded table card
+ * ═══════════════════════════════════════════════════════════════════════ */
 function UserProfile() {
   const token = keycloak.tokenParsed;
   if (!token) return null;
@@ -301,7 +347,7 @@ function UserProfile() {
   return (
     <div style={styles.card}>
       <h2 style={styles.cardTitle}>
-        <span style={{ marginRight: 8 }}>&#128100;</span> User Profile
+        <span style={styles.cardIcon}>👤</span> User Profile
       </h2>
       <table style={styles.table}>
         <tbody>
@@ -317,7 +363,9 @@ function UserProfile() {
   );
 }
 
-/* ─── API Demo ─────────────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════════════
+ * API DEMO — Call the local region's protected API
+ * ═══════════════════════════════════════════════════════════════════════ */
 function ApiDemo() {
   const [userInfoResult, setUserInfoResult] = useState<string>("");
   const [dataResult, setDataResult] = useState<string>("");
@@ -350,23 +398,23 @@ function ApiDemo() {
   return (
     <div style={styles.card}>
       <h2 style={styles.cardTitle}>
-        <span style={{ marginRight: 8 }}>&#128268;</span> Protected API
+        <span style={styles.cardIcon}>🔗</span> Protected API
       </h2>
-      <p style={{ color: "#666", fontSize: 14, margin: "0 0 16px" }}>
+      <p style={styles.cardSubtext}>
         Call the {REGION} Express API server at{" "}
         <code style={styles.code}>{API_URL}</code> with your Bearer token.
       </p>
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+      <div style={styles.btnRow}>
         <button
-          style={styles.btnPrimary}
+          style={styles.btnTeal}
           onClick={() => callApi("userinfo", setUserInfoResult, "userinfo")}
           disabled={loading.userinfo}
         >
           {loading.userinfo ? "Loading..." : "GET /api/userinfo"}
         </button>
         <button
-          style={styles.btnSecondary}
+          style={styles.btnNavy}
           onClick={() => callApi("data", setDataResult, "data")}
           disabled={loading.data}
         >
@@ -376,17 +424,13 @@ function ApiDemo() {
 
       {userInfoResult && (
         <div style={{ marginBottom: 12 }}>
-          <div style={{ fontSize: 12, color: "#888", marginBottom: 4 }}>
-            /api/userinfo response:
-          </div>
+          <div style={styles.preLabel}>/api/userinfo response:</div>
           <pre style={styles.pre}>{userInfoResult}</pre>
         </div>
       )}
       {dataResult && (
         <div>
-          <div style={{ fontSize: 12, color: "#888", marginBottom: 4 }}>
-            /api/data response:
-          </div>
+          <div style={styles.preLabel}>/api/data response:</div>
           <pre style={styles.pre}>{dataResult}</pre>
         </div>
       )}
@@ -394,7 +438,9 @@ function ApiDemo() {
   );
 }
 
-/* ─── Cross-Region API Demo ────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════════════
+ * CROSS-REGION API DEMO — Call the OTHER region's API with local token
+ * ═══════════════════════════════════════════════════════════════════════ */
 /**
  * Demonstrates calling the OTHER region's API directly from this app.
  * The same Keycloak-issued Bearer token is sent to the foreign API,
@@ -452,46 +498,23 @@ function CrossRegionApiDemo() {
   return (
     <div style={{ ...styles.card, marginTop: 24 }}>
       <h2 style={styles.cardTitle}>
-        <span style={{ marginRight: 8 }}>&#127760;</span> Cross-Region API
-        <span
-          style={{
-            marginLeft: 8,
-            fontSize: 12,
-            fontWeight: 500,
-            padding: "2px 8px",
-            borderRadius: 4,
-            backgroundColor: "#fff3cd",
-            color: "#856404",
-            border: "1px solid #ffc107",
-          }}
-        >
-          {OTHER_REGION}
-        </span>
+        <span style={styles.cardIcon}>🌐</span> Cross-Region API
+        <span style={styles.regionTag}>{OTHER_REGION}</span>
       </h2>
-      <p style={{ color: "#666", fontSize: 14, margin: "0 0 8px" }}>
+      <p style={styles.cardSubtext}>
         Call the <strong>{OTHER_REGION}</strong> Express API server at{" "}
         <code style={styles.code}>{OTHER_API_URL}</code> using your{" "}
         <strong>{REGION}</strong> Keycloak token. The {OTHER_REGION} API
         trusts tokens from both Keycloaks via multi-issuer JWKS validation.
       </p>
-      <p
-        style={{
-          color: "#888",
-          fontSize: 12,
-          margin: "0 0 16px",
-          fontStyle: "italic",
-        }}
-      >
+      <p style={styles.cardItalic}>
         This proves your {REGION}-issued token is accepted cross-region
         without a separate login.
       </p>
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+      <div style={styles.btnRow}>
         <button
-          style={{
-            ...styles.btnPrimary,
-            backgroundColor: "#e67e22",
-          }}
+          style={styles.btnTeal}
           onClick={() =>
             callCrossApi("userinfo", setUserInfoResult, "userinfo")
           }
@@ -502,10 +525,7 @@ function CrossRegionApiDemo() {
             : `GET ${OTHER_REGION} /api/userinfo`}
         </button>
         <button
-          style={{
-            ...styles.btnPrimary,
-            backgroundColor: "#8e44ad",
-          }}
+          style={styles.btnNavy}
           onClick={() => callCrossApi("data", setDataResult, "data")}
           disabled={loading.data}
         >
@@ -517,7 +537,7 @@ function CrossRegionApiDemo() {
 
       {userInfoResult && (
         <div style={{ marginBottom: 12 }}>
-          <div style={{ fontSize: 12, color: "#888", marginBottom: 4 }}>
+          <div style={styles.preLabel}>
             {OTHER_REGION} /api/userinfo response:
           </div>
           <pre style={styles.pre}>{userInfoResult}</pre>
@@ -525,7 +545,7 @@ function CrossRegionApiDemo() {
       )}
       {dataResult && (
         <div>
-          <div style={{ fontSize: 12, color: "#888", marginBottom: 4 }}>
+          <div style={styles.preLabel}>
             {OTHER_REGION} /api/data response:
           </div>
           <pre style={styles.pre}>{dataResult}</pre>
@@ -535,27 +555,24 @@ function CrossRegionApiDemo() {
   );
 }
 
-/* ─── Token Details ────────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════════════
+ * TOKEN DETAILS — Expandable raw JWT viewer
+ * ═══════════════════════════════════════════════════════════════════════ */
 function TokenDetails() {
   const [expanded, setExpanded] = useState(false);
   const token = keycloak.tokenParsed;
   if (!token) return null;
 
   return (
-    <div style={styles.card}>
+    <div style={{ ...styles.card, marginTop: 24 }}>
       <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          cursor: "pointer",
-        }}
+        style={styles.expandHeader}
         onClick={() => setExpanded(!expanded)}
       >
         <h2 style={{ ...styles.cardTitle, margin: 0 }}>
-          <span style={{ marginRight: 8 }}>&#128273;</span> Raw Token
+          <span style={styles.cardIcon}>🔑</span> Raw Token
         </h2>
-        <span style={{ color: REGION_COLOR, fontSize: 14 }}>
+        <span style={{ color: KF_TEAL, fontSize: 14, cursor: "pointer" }}>
           {expanded ? "Collapse ▲" : "Expand ▼"}
         </span>
       </div>
@@ -568,14 +585,18 @@ function TokenDetails() {
   );
 }
 
-/* ─── Styles ───────────────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════════════
+ * STYLES — Korn Ferry Talent Suite design system
+ * All visual tokens derived from the KF brand screenshots provided.
+ * ═══════════════════════════════════════════════════════════════════════ */
 const styles: Record<string, React.CSSProperties> = {
+  /* ── Global ─────────────────────────────────────────────────────── */
   root: {
     minHeight: "100vh",
-    backgroundColor: "#f5f5f5",
-    fontFamily:
-      '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+    backgroundColor: KF_GRAY_100,
+    fontFamily: kfFont,
     margin: 0,
+    color: KF_GRAY_700,
   },
   loadingContainer: {
     display: "flex",
@@ -583,72 +604,289 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: "center",
     justifyContent: "center",
     minHeight: "100vh",
+    background: `linear-gradient(135deg, #e0f7ef 0%, #f0f9ff 50%, #e0f7ef 100%)`,
   },
   spinner: {
     width: 40,
     height: 40,
-    border: `4px solid ${REGION_BG}`,
-    borderTop: `4px solid ${REGION_COLOR}`,
+    border: `4px solid ${KF_TEAL_LIGHT}`,
+    borderTop: `4px solid ${KF_TEAL}`,
     borderRadius: "50%",
     animation: "spin 1s linear infinite",
   },
+
+  /* ── Navbar (authenticated) ─────────────────────────────────────── */
   navbar: {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
-    padding: "0 24px",
-    height: 60,
+    padding: "0 28px",
+    height: 56,
     backgroundColor: "#fff",
-    borderBottom: `3px solid ${REGION_COLOR}`,
-    boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+    borderBottom: `1px solid ${KF_GRAY_200}`,
+    boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
   },
   navLeft: {
     display: "flex",
     alignItems: "center",
-    gap: 12,
+    gap: 8,
   },
   navRight: {
     display: "flex",
     alignItems: "center",
-    gap: 12,
+    gap: 16,
   },
-  regionBadge: {
-    backgroundColor: REGION_COLOR,
-    color: "#fff",
-    padding: "4px 12px",
-    borderRadius: 4,
+  brandKornFerry: {
+    fontSize: 11,
     fontWeight: 700,
-    fontSize: 13,
+    letterSpacing: 2.5,
+    color: KF_NAVY,
+    textTransform: "uppercase" as const,
+    marginRight: 4,
+  },
+  brandTalent: {
+    fontSize: 18,
+    fontWeight: 700,
+    color: KF_GREEN,
     letterSpacing: 1,
   },
-  navTitle: {
+  brandSuite: {
+    fontSize: 18,
+    fontWeight: 700,
+    color: KF_NAVY,
+    letterSpacing: 1,
+  },
+  regionChip: {
+    marginLeft: 12,
+    fontSize: 11,
     fontWeight: 600,
-    fontSize: 16,
-    color: "#333",
+    padding: "3px 10px",
+    borderRadius: 12,
+    backgroundColor: KF_TEAL_LIGHT,
+    color: KF_TEAL,
+    border: `1px solid ${KF_TEAL}33`,
   },
-  username: {
-    color: "#555",
+  helpIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: "50%",
+    border: `1px solid ${KF_GRAY_300}`,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
     fontSize: 14,
+    color: KF_GRAY_500,
+    cursor: "pointer",
   },
+  avatar: {
+    width: 34,
+    height: 34,
+    borderRadius: "50%",
+    backgroundColor: KF_TEAL,
+    color: "#fff",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: 13,
+    fontWeight: 700,
+    cursor: "pointer",
+    letterSpacing: 0.5,
+  },
+
+  /* ── Main content area ──────────────────────────────────────────── */
   main: {
-    maxWidth: 960,
+    maxWidth: 1100,
     margin: "0 auto",
-    padding: "24px 16px",
+    padding: "24px 24px 48px",
   },
-  landing: {
+
+  /* ── Landing page (login) — Korn Ferry gradient background ─────── */
+  landingRoot: {
+    minHeight: "100vh",
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
-    minHeight: "70vh",
+    position: "relative" as const,
+    overflow: "hidden",
+    /* Soft gradient background matching KF Talent Suite login */
+    background: "linear-gradient(160deg, #f0faf5 0%, #f5faff 30%, #e8faf2 50%, #edf7ff 70%, #f0faf5 100%)",
+  },
+  gradientBlobTopRight: {
+    position: "absolute" as const,
+    top: -60,
+    right: -40,
+    width: 420,
+    height: 420,
+    borderRadius: "50%",
+    background: "radial-gradient(circle, rgba(26,155,108,0.12) 0%, rgba(26,155,108,0.02) 70%)",
+    filter: "blur(40px)",
+    pointerEvents: "none" as const,
+  },
+  gradientBlobBottomLeft: {
+    position: "absolute" as const,
+    bottom: -80,
+    left: -60,
+    width: 500,
+    height: 500,
+    borderRadius: "50%",
+    background: "radial-gradient(circle, rgba(13,124,95,0.10) 0%, rgba(13,124,95,0.01) 70%)",
+    filter: "blur(50px)",
+    pointerEvents: "none" as const,
   },
   landingCard: {
+    position: "relative" as const,
+    zIndex: 1,
     background: "#fff",
-    borderRadius: 12,
-    padding: "48px 40px",
+    borderRadius: 16,
+    padding: "48px 44px 36px",
     textAlign: "center" as const,
-    boxShadow: "0 2px 12px rgba(0,0,0,0.08)",
-    maxWidth: 520,
+    boxShadow: "0 4px 24px rgba(0,0,0,0.07)",
+    maxWidth: 420,
+    width: "100%",
   },
+  landingBrandRow: {
+    marginBottom: 4,
+  },
+  landingKF: {
+    fontSize: 12,
+    fontWeight: 700,
+    letterSpacing: 3,
+    color: KF_NAVY,
+    textTransform: "uppercase" as const,
+  },
+  landingTitleRow: {
+    marginBottom: 20,
+    lineHeight: 1.15,
+  },
+  landingTalent: {
+    fontSize: 42,
+    fontWeight: 800,
+    color: KF_GREEN,
+    letterSpacing: 3,
+  },
+  landingSuite: {
+    fontSize: 42,
+    fontWeight: 800,
+    color: KF_NAVY,
+    letterSpacing: 3,
+  },
+  regionSubLabel: {
+    fontSize: 13,
+    color: KF_GRAY_500,
+    margin: "0 0 24px",
+    fontWeight: 500,
+  },
+  signInLabel: {
+    fontSize: 15,
+    fontWeight: 600,
+    color: KF_GRAY_900,
+    margin: "0 0 12px",
+    textAlign: "left" as const,
+  },
+
+  /* ── Email form (landing) ───────────────────────────────────────── */
+  emailForm: {
+    display: "flex",
+    flexDirection: "column" as const,
+    gap: 10,
+    textAlign: "left" as const,
+  },
+  emailInput: {
+    width: "100%",
+    padding: "11px 14px",
+    fontSize: 14,
+    border: `1px solid ${KF_GRAY_300}`,
+    borderRadius: 6,
+    outline: "none",
+    boxSizing: "border-box" as const,
+    transition: "border-color 0.15s ease",
+    color: KF_GRAY_700,
+  },
+  errorText: {
+    color: "#dc3545",
+    fontSize: 13,
+    margin: "2px 0 0",
+  },
+  signInBtn: {
+    width: "100%",
+    padding: "11px 0",
+    fontSize: 15,
+    fontWeight: 600,
+    fontFamily: kfFont,
+    border: "none",
+    borderRadius: 6,
+    cursor: "pointer",
+    /* Gray Sign In matching screenshot 1 until focused */
+    backgroundColor: "#c8ccd0",
+    color: "#fff",
+    transition: "background-color 0.2s ease",
+    marginTop: 2,
+  },
+
+  /* ── Divider ────────────────────────────────────────────────────── */
+  divider: {
+    display: "flex",
+    alignItems: "center",
+    margin: "20px 0",
+    gap: 12,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: KF_GRAY_200,
+  },
+  dividerText: {
+    fontSize: 12,
+    color: KF_GRAY_500,
+    fontWeight: 600,
+  },
+
+  /* ── Direct Keycloak login button ───────────────────────────────── */
+  directLoginBtn: {
+    width: "100%",
+    padding: "10px 0",
+    fontSize: 14,
+    fontWeight: 600,
+    fontFamily: kfFont,
+    backgroundColor: "transparent",
+    color: KF_TEAL,
+    border: `1px solid ${KF_TEAL}`,
+    borderRadius: 6,
+    cursor: "pointer",
+    transition: "background-color 0.15s ease",
+  },
+  landingFooter: {
+    color: KF_GRAY_500,
+    fontSize: 12,
+    marginTop: 20,
+  },
+  footerLink: {
+    color: KF_TEAL,
+    textDecoration: "underline",
+  },
+
+  /* ── Sync info banner ───────────────────────────────────────────── */
+  syncBanner: {
+    display: "flex",
+    alignItems: "flex-start",
+    gap: 10,
+    padding: "14px 18px",
+    borderRadius: 8,
+    backgroundColor: KF_TEAL_LIGHT,
+    border: `1px solid ${KF_TEAL}22`,
+    marginBottom: 20,
+    fontSize: 13,
+    lineHeight: 1.5,
+    color: KF_GRAY_700,
+  },
+  syncIcon: {
+    fontSize: 16,
+    color: KF_TEAL,
+    marginTop: 1,
+    flexShrink: 0,
+  },
+
+  /* ── Cross-region banner ────────────────────────────────────────── */
   crossBanner: {
     display: "flex",
     justifyContent: "space-between",
@@ -656,65 +894,105 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 16,
     padding: "16px 20px",
     borderRadius: 8,
-    backgroundColor: REGION_BG,
-    border: `1px solid ${REGION_COLOR}33`,
+    backgroundColor: "#fff",
+    border: `1px solid ${KF_GRAY_200}`,
     marginBottom: 24,
     flexWrap: "wrap" as const,
+    fontSize: 14,
+    lineHeight: 1.6,
   },
   crossBtn: {
     display: "inline-block",
-    backgroundColor: REGION_COLOR,
+    backgroundColor: KF_TEAL,
     color: "#fff",
-    padding: "10px 20px",
+    padding: "10px 22px",
     borderRadius: 6,
     textDecoration: "none",
     fontWeight: 600,
     fontSize: 14,
     whiteSpace: "nowrap" as const,
+    transition: "background-color 0.15s ease",
   },
+
+  /* ── Grid layout ────────────────────────────────────────────────── */
   grid: {
     display: "grid",
     gridTemplateColumns: "1fr 1fr",
     gap: 24,
-    marginBottom: 24,
+    marginBottom: 0,
   },
+
+  /* ── Cards ──────────────────────────────────────────────────────── */
   card: {
     background: "#fff",
     borderRadius: 10,
-    padding: "20px 24px",
-    boxShadow: "0 1px 6px rgba(0,0,0,0.06)",
-    marginBottom: 0,
+    padding: "22px 24px",
+    boxShadow: "0 1px 4px rgba(0,0,0,0.05)",
+    border: `1px solid ${KF_GRAY_200}`,
   },
   cardTitle: {
     margin: "0 0 16px",
-    fontSize: 17,
-    fontWeight: 600,
-    color: "#1a1a1a",
+    fontSize: 16,
+    fontWeight: 700,
+    color: KF_GRAY_900,
+    display: "flex",
+    alignItems: "center",
   },
+  cardIcon: {
+    marginRight: 8,
+    fontSize: 18,
+  },
+  cardSubtext: {
+    color: KF_GRAY_500,
+    fontSize: 13,
+    margin: "0 0 16px",
+    lineHeight: 1.5,
+  },
+  cardItalic: {
+    color: KF_GRAY_500,
+    fontSize: 12,
+    margin: "0 0 16px",
+    fontStyle: "italic",
+  },
+  regionTag: {
+    marginLeft: 8,
+    fontSize: 11,
+    fontWeight: 600,
+    padding: "2px 8px",
+    borderRadius: 4,
+    backgroundColor: "#fff3cd",
+    color: "#856404",
+    border: "1px solid #ffc107",
+  },
+
+  /* ── Table ──────────────────────────────────────────────────────── */
   table: {
     width: "100%",
     borderCollapse: "collapse" as const,
-    fontSize: 14,
-  },
-  tdLabel: {
-    padding: "8px 12px 8px 0",
-    fontWeight: 600,
-    color: "#555",
-    whiteSpace: "nowrap" as const,
-    borderBottom: "1px solid #f0f0f0",
-    width: "35%",
-  },
-  tdValue: {
-    padding: "8px 0",
-    color: "#333",
-    borderBottom: "1px solid #f0f0f0",
-    wordBreak: "break-all" as const,
-    fontFamily: "monospace",
     fontSize: 13,
   },
+  tdLabel: {
+    padding: "9px 12px 9px 0",
+    fontWeight: 600,
+    color: KF_GRAY_500,
+    whiteSpace: "nowrap" as const,
+    borderBottom: `1px solid ${KF_GRAY_200}`,
+    width: "35%",
+    fontSize: 13,
+  },
+  tdValue: {
+    padding: "9px 0",
+    color: KF_GRAY_900,
+    borderBottom: `1px solid ${KF_GRAY_200}`,
+    wordBreak: "break-all" as const,
+    fontFamily: '"SF Mono", "Fira Code", "Fira Mono", "Roboto Mono", monospace',
+    fontSize: 12,
+  },
+
+  /* ── Pre/code blocks ────────────────────────────────────────────── */
   pre: {
-    backgroundColor: "#f8f9fa",
-    border: "1px solid #e9ecef",
+    backgroundColor: KF_GRAY_100,
+    border: `1px solid ${KF_GRAY_200}`,
     borderRadius: 6,
     padding: 14,
     overflow: "auto",
@@ -722,89 +1000,59 @@ const styles: Record<string, React.CSSProperties> = {
     lineHeight: 1.5,
     maxHeight: 260,
     margin: 0,
+    fontFamily: '"SF Mono", "Fira Code", "Fira Mono", "Roboto Mono", monospace',
+  },
+  preLabel: {
+    fontSize: 12,
+    color: KF_GRAY_500,
+    marginBottom: 4,
+    fontWeight: 500,
   },
   code: {
-    backgroundColor: "#f0f0f0",
+    backgroundColor: KF_GRAY_100,
     padding: "2px 6px",
-    borderRadius: 3,
+    borderRadius: 4,
+    fontSize: 12,
+    fontFamily: '"SF Mono", "Fira Code", "Fira Mono", "Roboto Mono", monospace',
+    color: KF_TEAL,
+  },
+
+  /* ── Buttons ────────────────────────────────────────────────────── */
+  btnTeal: {
+    backgroundColor: KF_TEAL,
+    color: "#fff",
+    border: "none",
+    padding: "9px 20px",
+    borderRadius: 6,
+    fontWeight: 600,
     fontSize: 13,
-    fontFamily: "monospace",
+    fontFamily: kfFont,
+    cursor: "pointer",
+    transition: "background-color 0.15s ease",
   },
-  btnPrimary: {
-    backgroundColor: REGION_COLOR,
+  btnNavy: {
+    backgroundColor: KF_NAVY,
     color: "#fff",
     border: "none",
-    padding: "8px 20px",
+    padding: "9px 20px",
     borderRadius: 6,
     fontWeight: 600,
-    fontSize: 14,
+    fontSize: 13,
+    fontFamily: kfFont,
     cursor: "pointer",
+    transition: "background-color 0.15s ease",
   },
-  btnSecondary: {
-    backgroundColor: "#6c757d",
-    color: "#fff",
-    border: "none",
-    padding: "8px 20px",
-    borderRadius: 6,
-    fontWeight: 600,
-    fontSize: 14,
-    cursor: "pointer",
-  },
-  btnOutline: {
-    backgroundColor: "transparent",
-    color: REGION_COLOR,
-    border: `1px solid ${REGION_COLOR}`,
-    padding: "7px 20px",
-    borderRadius: 6,
-    fontWeight: 600,
-    fontSize: 14,
-    cursor: "pointer",
-  },
-  /* ─── Email Login Form Styles ─────────────────────────────────────── */
-  emailForm: {
+  btnRow: {
     display: "flex",
-    flexDirection: "column" as const,
     gap: 8,
-    textAlign: "left" as const,
-    marginTop: 8,
+    marginBottom: 14,
   },
-  inputLabel: {
-    fontSize: 14,
-    fontWeight: 600,
-    color: "#344054",
-    marginBottom: 2,
-  },
-  emailInput: {
-    width: "100%",
-    padding: "10px 14px",
-    fontSize: 15,
-    border: "1px solid #d0d5dd",
-    borderRadius: 8,
-    outline: "none",
-    boxSizing: "border-box" as const,
-    transition: "border-color 0.15s ease",
-  },
-  errorText: {
-    color: "#dc3545",
-    fontSize: 13,
-    margin: "2px 0 0",
-  },
-  divider: {
+
+  /* ── Expand/collapse header ─────────────────────────────────────── */
+  expandHeader: {
     display: "flex",
+    justifyContent: "space-between",
     alignItems: "center",
-    margin: "20px 0",
-  },
-  dividerText: {
-    flex: 1,
-    textAlign: "center" as const,
-    fontSize: 13,
-    color: "#999",
-    position: "relative" as const,
-    /* Horizontal lines created via border-top on pseudo-like wrapper */
-    borderTop: "1px solid #e0e0e0",
-    lineHeight: "0",
-    padding: "0 12px",
-    background: "#fff",
+    cursor: "pointer",
   },
 };
-
